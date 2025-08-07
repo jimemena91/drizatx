@@ -1,33 +1,39 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Service } from '../services/entities/service.entity';
+import { Operator } from '../operators/entities/operator.entity';
+import { Ticket, TicketStatus } from '../tickets/entities/ticket.entity';
 import { TicketsService } from '../tickets/tickets.service';
-import { OperatorsService } from '../operators/operators.service';
-import { ServicesService } from '../services/services.service';
 
 @Injectable()
 export class ReportsService {
   constructor(
-    private readonly ticketsService: TicketsService,
-    private readonly operatorsService: OperatorsService,
-    private readonly servicesService: ServicesService,
+    @InjectRepository(Service)
+    private readonly serviceRepo: Repository<Service>,
+    @InjectRepository(Operator)
+    private readonly operatorRepo: Repository<Operator>,
+    private readonly ticketsService: TicketsService
   ) {}
 
-  generateReport() {
-    const tickets = this.ticketsService.findAll();
-    const operators = this.operatorsService.findAll();
-    const services = this.servicesService.findAll();
+  async generarReporte() {
+    const tickets = await this.ticketsService.findAll(); // ✅ AQUI VA EL AWAIT
+    const servicios = await this.serviceRepo.find();
+    const operadores = await this.operatorRepo.find();
 
     return {
-      fecha: new Date().toISOString().split('T')[0],
       totalTurnos: tickets.length,
-      atendidos: tickets.filter(t => t.status === 'COMPLETED').length,
-      servicios: services.map(s => ({
-        name: s.name,
-        tickets: tickets.filter(t => t.serviceId === s.id).length,
+      atendidos: tickets.filter(t => t.status === TicketStatus.COMPLETED).length,
+      servicios: servicios.map(s => ({
+        nombre: s.name,
+        tickets: tickets.filter(t => t.serviceId === s.id).length
       })),
-      operadores: operators.map(o => ({
-        name: o.name,
-        ticketsAtendidos: tickets.filter(t => t.operatorId === o.id && t.status === 'COMPLETED').length,
-      })),
+      operadores: operadores.map(o => ({
+        nombre: o.name,
+        ticketsAtendidos: tickets.filter(t =>
+          t.operatorId === o.id && t.status === TicketStatus.COMPLETED
+        ).length
+      }))
     };
   }
 }

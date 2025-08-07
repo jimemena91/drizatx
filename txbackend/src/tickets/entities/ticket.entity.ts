@@ -1,3 +1,14 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
+import { Service } from '../../services/entities/service.entity';
+import { Operator } from '../../operators/entities/operator.entity';
+
 export enum TicketStatus {
   WAITING = 'WAITING',
   CALLED = 'CALLED',
@@ -6,14 +17,43 @@ export enum TicketStatus {
   CANCELLED = 'CANCELLED',
 }
 
+@Entity('tickets')
 export class Ticket {
+  @PrimaryGeneratedColumn()
   id: number;
-  number: string; // Ej: A012
-  serviceId: number;
-  operatorId?: number;
-  createdAt: Date;
+
+  @Column()
+  number: string;
+
+  @Column({ type: 'enum', enum: TicketStatus, default: TicketStatus.WAITING })
   status: TicketStatus;
-  estimatedWaitTime?: number;
-  actualWaitTime?: number;
+
+  @Column({ nullable: true })
   mobilePhone?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  calledAt?: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  startedAt?: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  completedAt?: Date;
+
+  @Column()
+  serviceId: number;
+
+  @ManyToOne(() => Service, (service) => service.tickets)
+  @JoinColumn({ name: 'serviceId' })
+  service: Service;
+
+  @Column({ nullable: true })
+  operatorId?: number;
+
+  @ManyToOne(() => Operator, (operator) => operator.tickets, { nullable: true })
+  @JoinColumn({ name: 'operatorId' })
+  operator: Operator;
 }

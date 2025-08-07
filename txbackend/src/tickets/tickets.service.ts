@@ -1,35 +1,35 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
+import { CreateTicketDto } from './dto/create-ticket.dto';
 
 @Injectable()
 export class TicketsService {
-  private tickets: Ticket[] = [];
-  private currentId = 1;
+  constructor(
+    @InjectRepository(Ticket)
+    private readonly ticketRepo: Repository<Ticket>
+  ) {}
 
-  create(serviceId: number, mobilePhone?: string): Ticket {
-    const number = `T${String(this.currentId).padStart(3, '0')}`;
-    const ticket: Ticket = {
-      id: this.currentId++,
-      number,
-      serviceId,
+  async create(dto: CreateTicketDto): Promise<Ticket> {
+    const ticket = this.ticketRepo.create({
+      ...dto,
       status: TicketStatus.WAITING,
-      createdAt: new Date(),
-      mobilePhone,
-    };
+    });
 
-    this.tickets.push(ticket);
-    return ticket;
+    return this.ticketRepo.save(ticket);
   }
 
-  findAll(): Ticket[] {
-    return this.tickets;
-  }
+  async findAll(): Promise<Ticket[]> {
+  return this.ticketRepo.find({
+    relations: ['service', 'operator'],
+  });
+}
+async updateStatus(id: number, status: TicketStatus): Promise<Ticket> {
+  const ticket = await this.ticketRepo.findOne({ where: { id } });
+  if (!ticket) throw new Error('Ticket not found');
 
-  updateStatus(id: number, status: TicketStatus): Ticket | null {
-  const ticket = this.tickets.find(t => t.id === id);
-  if (ticket) {
-    ticket.status = status;
-  }
-  return ticket ?? null;
+  ticket.status = status;
+  return this.ticketRepo.save(ticket);
 }
 }

@@ -1,8 +1,31 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+} from 'typeorm';
+import { Ticket } from '../../tickets/entities/ticket.entity';
+
+@Entity('services')
 export class Service {
+  @PrimaryGeneratedColumn()
   id: number;
+
+  @Column()
   name: string;
-  prefix: string; // Ej: A, B, C
-  priority: number; // 1 = alta prioridad
-  estimatedTime: number; // en minutos
+
+  @Column()
+  prefix: string;
+
+  @Column({ default: 1 })
+  priority: number;
+
+  @Column({ default: 10 })
+  estimatedTime: number;
+
+  @Column({ default: true })
   active: boolean;
+
+  @OneToMany(() => Ticket, (ticket) => ticket.service)
+  tickets: Ticket[];
 }

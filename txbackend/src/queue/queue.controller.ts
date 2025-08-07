@@ -7,6 +7,7 @@ export class QueueController {
 
   @Get('status')
   getStatus() {
-    return this.queueService.getStatus();
+    return this.queueService.getQueueStatus(); // ✅
+
   }
 }

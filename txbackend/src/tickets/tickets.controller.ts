@@ -1,15 +1,16 @@
 import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { TicketStatus } from './entities/ticket.entity';
+import { CreateTicketDto } from './dto/create-ticket.dto';
 
 @Controller('tickets')
 export class TicketsController {
   constructor(private readonly ticketsService: TicketsService) {}
 
   @Post()
-  create(@Body() body: { serviceId: number; mobilePhone?: string }) {
-    return this.ticketsService.create(body.serviceId, body.mobilePhone);
-  }
+async create(@Body() dto: CreateTicketDto) {
+  return this.ticketsService.create(dto);
+}
 
   @Get()
   findAll() {
