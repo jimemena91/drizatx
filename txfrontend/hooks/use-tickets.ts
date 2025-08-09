@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useQueue } from '@/contexts/queue-context'
-import { Ticket, Status, TicketWithRelations } from '@/lib/types'
+import { Ticket, Status, Service, Operator } from '@/lib/types'
+
+type TicketWithRelations = Ticket & {
+  service: Service
+  operator: Operator | null
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 export function useTickets() {
   const { state, dispatch } = useQueue()
@@ -13,12 +20,25 @@ export function useTickets() {
   const fetchTickets = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/tickets')
+      const response = await fetch(`${API_URL}/tickets`)
       if (!response.ok) {
         throw new Error('Failed to fetch tickets')
       }
       const data = await response.json()
-      setTickets(data)
+       const parsed: Ticket[] = data.map((t: any) => ({
+        ...t,
+        createdAt: new Date(t.createdAt),
+        calledAt: t.calledAt ? new Date(t.calledAt) : null,
+        startedAt: t.startedAt ? new Date(t.startedAt) : null,
+        completedAt: t.completedAt ? new Date(t.completedAt) : null,
+      }))
+      dispatch({ type: 'SET_TICKETS', payload: parsed })
+      const withRelations: TicketWithRelations[] = parsed.map(ticket => ({
+        ...ticket,
+        service: state.services.find(s => s.id === ticket.serviceId)!,
+        operator: ticket.operatorId ? state.operators.find(o => o.id === ticket.operatorId) : null,
+      }))
+      setTickets(withRelations)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -26,84 +46,63 @@ export function useTickets() {
       setLoading(false)
     }
   }
-
-  const createTicket = (serviceId: number, mobilePhone?: string, priority: number = 1) => {
-    const service = state.services.find(s => s.id === serviceId)
-    if (!service) {
-      throw new Error('Service not found')
+  const createTicket = async (serviceId: number, mobilePhone?: string) => {
+    const response = await fetch(`${API_URL}/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serviceId, mobilePhone }),
+    })
+    if (!response.ok) {
+      throw new Error('Failed to create ticket')
     }
-
-    // Generar número de turno
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const todayTickets = state.tickets.filter(t => 
-      t.serviceId === serviceId && 
-      t.createdAt >= today
-    )
-    
-    const nextNumber = todayTickets.length + 1
-    const ticketNumber = `${service.prefix}${nextNumber.toString().padStart(3, '0')}`
-
-    // Calcular tiempo de espera estimado
-    const waitingCount = state.tickets.filter(t => 
-      t.serviceId === serviceId && 
-      (t.status === Status.WAITING || t.status === Status.CALLED)
-    ).length
-
-    const estimatedWaitTime = waitingCount * service.estimatedTime
-
-    const newTicket: Ticket = {
-      id: Math.max(...state.tickets.map(t => t.id), 0) + 1,
-      number: ticketNumber,
-      serviceId,
-      status: Status.WAITING,
-      priority,
-      createdAt: new Date(),
-      calledAt: null,
-      startedAt: null,
-      completedAt: null,
-      operatorId: null,
-      estimatedWaitTime,
-      actualWaitTime: null,
-      mobilePhone: mobilePhone || null,
-      notificationSent: false
+    const newTicket = await response.json()
+    const parsed: Ticket = {
+      ...newTicket,
+      createdAt: new Date(newTicket.createdAt),
+      calledAt: newTicket.calledAt ? new Date(newTicket.calledAt) : null,
+      startedAt: newTicket.startedAt ? new Date(newTicket.startedAt) : null,
+      completedAt: newTicket.completedAt ? new Date(newTicket.completedAt) : null,
+    } as Ticket
+    dispatch({ type: 'ADD_TICKET', payload: parsed })
+    const withRelations: TicketWithRelations = {
+      ...parsed,
+      service: state.services.find(s => s.id === parsed.serviceId)!,
+      operator: parsed.operatorId ? state.operators.find(o => o.id === parsed.operatorId) : null,
     }
-
-    dispatch({ type: 'ADD_TICKET', payload: newTicket })
-    return newTicket
+     setTickets(prev => [withRelations, ...prev])
+    return parsed
   }
-
-  const updateTicketStatus = (id: number, status: Status, operatorId?: number) => {
-    const updateData: Partial<Ticket> = { status }
-    
-    if (operatorId) {
-      updateData.operatorId = operatorId
+  const updateTicketStatus = async (
+    id: number,
+    status: Status,
+    operatorId?: number,
+  ) => {
+    const response = await fetch(`${API_URL}/tickets/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, operatorId }),
+    })
+    if (!response.ok) {
+      throw new Error('Failed to update ticket')
     }
-
-    // Agregar timestamps según el estado
-    const now = new Date()
-    switch (status) {
-      case Status.CALLED:
-        updateData.calledAt = now
-        break
-      case Status.IN_PROGRESS:
-        updateData.startedAt = now
-        break
-      case Status.COMPLETED:
-        updateData.completedAt = now
-        // Calcular tiempo real de espera
-        const ticket = state.tickets.find(t => t.id === id)
-        if (ticket) {
-          updateData.actualWaitTime = Math.round((now.getTime() - ticket.createdAt.getTime()) / 60000)
-        }
-        break
+     const updated = await response.json()
+    const parsed: Ticket = {
+      ...updated,
+      createdAt: new Date(updated.createdAt),
+      calledAt: updated.calledAt ? new Date(updated.calledAt) : null,
+      startedAt: updated.startedAt ? new Date(updated.startedAt) : null,
+      completedAt: updated.completedAt ? new Date(updated.completedAt) : null,
+    } as Ticket
+    dispatch({ type: 'UPDATE_TICKET', payload: { id, data: parsed } })
+    const withRelations: TicketWithRelations = {
+      ...parsed,
+      service: state.services.find(s => s.id === parsed.serviceId)!,
+      operator: parsed.operatorId ? state.operators.find(o => o.id === parsed.operatorId) : null,
     }
-
-    dispatch({ type: 'UPDATE_TICKET', payload: { id, data: updateData } })
+     setTickets(prev => prev.map(t => (t.id === id ? withRelations : t)))
+    return parsed
   }
-
-  const callNextTicket = (operatorId: number) => {
+  const callNextTicket = async (operatorId: number) => {
     const nextTicket = state.tickets
       .filter(t => t.status === Status.WAITING)
       .sort((a, b) => {
@@ -115,7 +114,7 @@ export function useTickets() {
       })[0]
 
     if (nextTicket) {
-      updateTicketStatus(nextTicket.id, Status.CALLED, operatorId)
+        await updateTicketStatus(nextTicket.id, Status.CALLED, operatorId)
       return nextTicket
     }
     return null
@@ -137,7 +136,7 @@ export function useTickets() {
     return getTicketsWithRelations().filter(ticket => ticket.serviceId === serviceId)
   }
 
-  const getTodayTickets = () => {
+   const getTodayTickets = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     return getTicketsWithRelations().filter(ticket => ticket.createdAt >= today)

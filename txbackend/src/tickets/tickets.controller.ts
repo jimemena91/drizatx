@@ -18,7 +18,10 @@ async create(@Body() dto: CreateTicketDto) {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() body: { status: TicketStatus }) {
-    return this.ticketsService.updateStatus(+id, body.status);
+    updateStatus(
+    @Param('id') id: string,
+    @Body() body: { status: TicketStatus; operatorId?: number },
+  ) {
+    return this.ticketsService.updateStatus(+id, body.status, body.operatorId);
   }
 }
