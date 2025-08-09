@@ -9,7 +9,8 @@ type TicketWithRelations = Ticket & {
   operator: Operator | null
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'; // fallback dev
 
 export function useTickets() {
   const { state, dispatch } = useQueue()
