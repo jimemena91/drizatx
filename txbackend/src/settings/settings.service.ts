@@ -1,25 +1,40 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Settings } from './entities/settings.entity';
+import { Repository, FindOptionsWhere } from 'typeorm';
+
+const DEFAULT_SETTINGS_ID = 1;
 
 @Injectable()
 export class SettingsService {
-  private settings: Settings = {
-    maxWaitTime: 15,
-    autoCallNext: true,
-    soundEnabled: true,
-    displayTimeout: 30,
-    mobileEnabled: true,
-    qrEnabled: true,
-    notificationsEnabled: true,
-  };
+  constructor(
+    @InjectRepository(Settings)
+    private readonly settingsRepository: Repository<Settings>,
+  ) {}
 
-  get(): Settings {
-    return this.settings;
+  async findAll(): Promise<Settings> {
+    const settings = await this.settingsRepository.findOne({
+      where: { id: DEFAULT_SETTINGS_ID } as FindOptionsWhere<Settings>,
+    });
+
+    if (!settings) {
+      throw new NotFoundException('Configuración no encontrada');
+    }
+
+    return settings;
   }
 
-  update<K extends keyof Settings>(key: K, value: Settings[K]): Settings {
-  this.settings[key] = value;
-  return this.settings;
+  async updateAll(partial: Partial<Settings>): Promise<Settings> {
+    const current = await this.settingsRepository.findOne({
+      where: { id: DEFAULT_SETTINGS_ID } as FindOptionsWhere<Settings>,
+    });
+
+    if (!current) {
+      throw new NotFoundException('Configuración no encontrada');
+    }
+
+    Object.assign(current, partial);
+
+    return this.settingsRepository.save(current);
+  }
 }
-}
-import { Module } from '@nestjs/common';

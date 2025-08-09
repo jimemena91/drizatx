@@ -1,17 +1,22 @@
-import { Controller, Get, Patch, Body } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Put } from '@nestjs/common';
 import { SettingsService } from './settings.service';
+import { ApiTags } from '@nestjs/swagger';
+import { Settings } from './entities/settings.entity';
 
+
+@ApiTags('settings')
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
-  @Get()
-  get() {
-    return this.settingsService.get();
+ @Put()
+  updateAll(@Body() settings: Partial<Settings>) {
+    return this.settingsService.updateAll(settings);
   }
 
-  @Patch()
-  update(@Body() body: { key: string; value: any }) {
-    return this.settingsService.update(body.key as any, body.value);
+ @Get()
+  getAll() {
+    return this.settingsService.findAll();
   }
 }
+
